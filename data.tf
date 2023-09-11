@@ -9,5 +9,9 @@ data "aws_subnets" "public" {
     name   = "vpc-id"
     values = [data.aws_vpc.selected.id]
   }
+
+  tags = {
+    Name = "*public*"
+  }
 }
 

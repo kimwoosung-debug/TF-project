@@ -1,8 +1,66 @@
-module "ecs" {
-  source = "./modules/ecs-cluster"
-  vpc_id = "vpc-0c8d294b31882c704"
+resource "aws_security_group" "allow_tls" {
+  name        = "sample-application-SG"
+  description = "Allow inbound traffic"
+  vpc_id      = data.aws_vpc.selected.id
 
-  private_subnets = ["subnet-0fe54d52751dd15c4", "subnet-0402cdbddc07916d5", "subnet-03c62e60e5d27d32d", "subnet-0957c53dc12e38e7f"]
-  public_subnets  = ["subnet-04a00c359a455a4a8", "subnet-026b72d5cced8fddc"]
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "sample-application-SG"
+  }
+}
+
+resource "aws_lb" "web" {
+  name               = "sample-loadbalancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.allow_tls.id]
+  subnets            = data.aws_subnets.public.ids
+
+  tags = {
+    Name = "sample-loadbalancer"
+  }
+}
+
+resource "aws_lb_target_group" "web" {
+  name     = "sample-application-TG"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.selected.id
+  health_check {
+    matcher = 200
+    path    = "/"
+  }
+}
+
+resource "aws_lb_listener" "web" {
+  load_balancer_arn = aws_lb.web.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
 }
